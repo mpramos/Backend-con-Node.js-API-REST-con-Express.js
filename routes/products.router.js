@@ -1,59 +1,61 @@
 const express = require('express');
-const faker = require('faker');
-const router= express.Router();
-router.get('/', (req, res) => {
-    const products=[];
-    const {size} = req.query;
-    const limit= size || 10;
-    for (let index = 0; index < limit; index++) {
-      products.push({
-        name:faker.commerce.productName(),
-        price:parseInt(faker.commerce.price(),10),
-        image: faker.image.imageUrl()
-      });
-    }
-    res.json(products)
-    })
-    router.get('/filter',(req,res)=>{
-        res.send('hola soy filter :D')
-      })
-router.get('/:id',(req,res)=>{
-  const {id}= req.params;
-  if(id==='999'){
-    res.status(404).json({
-      message:'ups not found :c'
-    })
-  }else{
-    res.json({
-      id,
-      name:'Product 2',
-      price: 2000
-    })
-  }
-})
- router.post('/',(req,res)=>{
-  const body = req.body;            //no usamos el destucturing porque queremos todo el cuerpo y no solo una partcita
-   res.status(201).json({
-     message:'created',
-     data:body
-   })
-})
-router.patch('/:id',(req,res)=>{
-  const {id}=req.params;
-  const body= req.body;
-  res.json({
-    message:'update',
-    data:body,
-    id
-  })
-})
-router.delete('/:id',(req,res)=>{
-  const {id} = req.params;
-  // const body= req.body;
-  res.json({
-    message:'deleted',
-    id
-  })
-})
+const router = express.Router();
+const ProductService = require('../services/product.service');
+const validatorHandler = require('../middlewares/validator.handler');
+const {
+  createProductSchema,
+  updateProductSchema,
+  getProductSchema,
+} = require('../schema/product.schema');
+const services = new ProductService();
 
-  module.exports=router;
+router.get('/', async (req, res) => {
+  const products = await services.find();
+  res.json(products);
+});
+router.get('/filter', (req, res) => {
+  res.send('hola soy filter :D');
+});
+router.get(
+  '/:id',// es un ida entonces para el middleware ponemos un getProductSchema
+  validatorHandler(getProductSchema,'params'), // hacemos una validacion de datos antes y quremos que la informacion venga de paramas
+  async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const product = await services.finOne(id);
+      res.json(product);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+router.post('/',
+validatorHandler(createProductSchema,'body'),
+async (req, res) => {
+  const body = req.body;
+  const newProduct = await services.create(body);
+  res.status(201).json(newProduct);
+});
+router.patch('/:id',
+validatorHandler(getProductSchema,'params'),
+validatorHandler(updateProductSchema,'body'),
+async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const body = req.body;
+    const product = await services.update(id, body);
+    res.json(product);
+  } catch (error) {
+    next(error);
+  }
+});
+router.delete('/:id',
+validatorHandler(getProductSchema,'params'),
+async (req, res) => {
+  const { id } = req.params;
+  // const body= req.body;
+  const rta = await services.delete(id);
+  res.json(rta);
+});
+
+module.exports = router;
